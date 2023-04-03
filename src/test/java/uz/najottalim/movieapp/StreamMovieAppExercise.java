@@ -12,6 +12,7 @@ import uz.najottalim.movieapp.repos.GenreRepo;
 import uz.najottalim.movieapp.repos.MovieRepo;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -128,7 +129,9 @@ public class StreamMovieAppExercise {
     @DisplayName("Janri 'Drama' bo'lgan eng tarixda suratga olingan kinoni chiqaring")
     public void exercise11() {
         Optional<Movie> drama = movieRepo.findAll().stream()
-                .filter(movie -> movie.getGenres().contains("Drama"))
+                .filter(movie -> movie.getGenres().stream()
+                        .map(genre -> genre.getName())
+                        .collect(Collectors.toList()).contains("Drama"))
                 .sorted((o1, o2) -> Integer.compare(o1.getYear(), o2.getYear()))
                 .findFirst();
         System.out.println(drama);
@@ -305,18 +308,84 @@ public class StreamMovieAppExercise {
     @Test
     @DisplayName("Eng kam kinolarga pul sarflagan rejissorni chiqaring")
     public void exercise15() {
+        Map<String, Double> collect = directorRepo.findAll().stream()
+                .collect(Collectors.toMap(
+                        Director::getName,
+                        director -> director.getMovies().stream()
+                                .mapToDouble(Movie::getSpending)
+                                .sum()
+                ))
+                .entrySet().stream()
+                .sorted((o1, o2) -> Double.compare(o2.getValue(),o1.getValue()))
+                .collect(Collectors.toMap(
+                        stringDoubleEntry -> stringDoubleEntry.getKey(),
+                        stringDoubleEntry -> stringDoubleEntry.getValue()
+                ));
+                collect.forEach((s, aDouble) -> {
+                    System.out.println(s + ":" + aDouble);
+                        }
+                );
+        System.out.println("-------------------------------------");
+        Optional<Director> min = directorRepo.findAll().stream()
+                .min((o1, o2) -> {
+                    return Double.compare(
+                            o1.getMovies().stream()
+                                    .mapToDouble(value -> value.getSpending())
+                                    .sum(),
+                            o2.getMovies().stream()
+                                    .mapToDouble(value -> value.getSpending())
+                                    .sum());
+                });
+        System.out.println(min);
 
     }
 
     @Test
     @DisplayName("Komediya kinolarini, 2000 chi yildan keyin olinganlarga ketgan narxni DoubleSummaryStatisticasini chiqaring")
     public void exercise16() {
+        DoubleSummaryStatistics komediya = movieRepo.findAll().stream()
+
+                .filter(movie -> movie.getGenres().stream()
+                        .map(genre -> genre.getName())
+                        .collect(Collectors.toList()).contains("Komediya"))
+                .filter(movie -> movie.getYear() > 2000)
+                .peek(movie ->{
+                    System.out.println(movie+":"+movie.getGenres());
+                })
+                .mapToDouble(value -> value.getSpending())
+                .peek(value -> {
+                    System.out.println("-----------------------------------------------");
+                })
+                .summaryStatistics();
+        System.out.println(komediya);
 
     }
 
     @Test
     @DisplayName("Qaysi kinoni eng ko'p rejissorlar birgalikda olishgan va ratingi eng baland chiqqan")
     public void exercise17() {
+        Optional<Movie> first = movieRepo.findAll().stream()
+                .sorted(
+                        (o1, o2) -> Integer.compare(
+                                o2.getDirectors().size(),
+                                o1.getDirectors().size()
+                        )
+                )
+                .findFirst();
+        Optional<Movie> first1 = movieRepo.findAll().stream()
+                .filter(movie -> movie.getDirectors().size() == first.orElse(new Movie()).getDirectors().size())
+                .peek(movie -> {
+                    System.out.println(
+                            movie.getDirectors().size()+" : "
+                                    +movie.getRating()
+                    );
+                })
+                .sorted((o1, o2) -> Double.compare(
+                        o2.getRating(),
+                        o1.getRating()
+                ))
+                .findFirst();
+        System.out.println(first1.orElse(new Movie()));
 
     }
 
@@ -324,17 +393,52 @@ public class StreamMovieAppExercise {
     @DisplayName("Har bir janrdagi kino nomlari umumiy nechta so'zdan iborat")
     public void exercise18() {
 
+         movieRepo.findAll().stream()
+                .flatMap(movie -> movie.getGenres().stream())
+                        .collect(Collectors.groupingBy(
+                                genre -> genre.getName()
+                        ));
     }
 
     @Test
     @DisplayName("Har bir asrda olingan kinolarni o'rtacha reytingini chiqaring")
     public void exercise19() {
+        Map<Integer, Double> collect = movieRepo.findAll().stream()
+                .collect(Collectors.groupingBy(
+                        movie -> movie.getYear() / 100
+                ))
+                .entrySet()
+                .stream().collect(Collectors.toMap(
+                        integerListEntry -> integerListEntry.getKey(),
+                        integerListEntry -> integerListEntry.getValue().stream()
+                                .mapToDouble(Movie::getRating).average().getAsDouble()
+                ));
+        collect.forEach(
+                (integer, aDouble) -> {
+                    System.out.println(integer +" : "+ aDouble);
+                }
+        );
 
     }
 
     @Test
     @DisplayName("Ismi A harfi bilan boshlanadigan rejissorlarni olgan kinolarini o'rtacha ratingi bo'yicha saralab chiqaring")
     public void exercise20() {
+        Map<String, Double> collect = directorRepo.findAll().stream()
+                .filter(director -> director.getName().charAt(0) == 'A')
+                .collect(Collectors.toMap(
+                        director -> director.getName(),
+                        director -> director.getMovies().stream()
+                                .mapToDouble(value -> value.getRating()).average().getAsDouble()
+                )).entrySet().stream()
+                        .sorted((o1, o2) -> Double.compare(o2.getValue(),o1.getValue()))
+                                .collect(Collectors.toMap(
+                                        stringDoubleEntry -> stringDoubleEntry.getKey(),
+                                        stringDoubleEntry -> stringDoubleEntry.getValue()
+                                ));
 
+        collect.forEach(
+                (s, aDouble) -> System.out.println(s+" :"+aDouble)
+        );
     }
 }
